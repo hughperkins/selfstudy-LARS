@@ -109,6 +109,50 @@ def run_lars(train):
     print('m', m)
     n = len(X)
     print('n', n)
+    active_set = set()
+
+    cur_pred = np.zeros((n,), dtype=np.float32)
+    print('cur_pred', cur_pred[:5])
+    residual = y - cur_pred
+    print('residual', residual[:5])
+    cur_corr = X.transpose().dot(residual)
+    print('cur_corr', cur_corr)
+    j = np.argmax(np.abs(cur_corr), 0)
+    print('j', j)
+    active_set.add(j)
+
+    X_a = X[:, list(active_set)]
+    # print('X_a', X_a)
+    G_a = X_a.transpose().dot(X_a)
+    print('G_a', G_a)
+    G_a_inv = np.linalg.inv(G_a)
+    G_a_inv_red_cols = np.sum(G_a_inv, 1)
+    print(G_a_inv_red_cols)
+    A_a = 1 / np.sqrt(np.sum(G_a_inv_red_cols))
+    print('A_a', A_a)
+    omega = A_a * G_a_inv_red_cols
+    equiangular = (omega * X_a).reshape(n)
+    print('equiangular[:5]', equiangular[:5])
+    print('equiangular.shape', equiangular.shape)
+    a = X.transpose().dot(equiangular)
+    print('a.shape', a.shape)
+    # print('a[:5, :5]', a[:5, :5])
+    gamma = None
+    largest_abs_correlation = cur_corr.max()
+    for j in active_set:
+        print('j', j)
+        print(cur_corr.shape, a.shape)
+        v0 = (largest_abs_correlation - cur_corr[j]) / (A_a - a[j]).item()
+        v1 = (largest_abs_correlation + cur_corr[j]) / (A_a + a[j]).item()
+        print('v0', v0, 'v1', v1)
+        if v0 > 0 and (gamma is None or v0 < gamma):
+            gamma = v0
+        if v1 > 0 and (gamma is None or v1 < gamma):
+            gamma = v1
+    print('gamma', gamma)
+    cur_pred += gamma * equiangular
+    print('cur_pred[:5]', cur_pred[:5])
+    print('resid[:5]', (y - cur_pred)[:5])
 
 
 def run():
