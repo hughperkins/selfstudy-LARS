@@ -52,8 +52,8 @@ def fetch_diabetes(subset='train'):
             if i == 0:
                 continue
             row = [float(v) for v in row]
-            data = row[:9]
-            target = row[10]
+            data = row[:-1]
+            target = row[-1]
             rows.append({'x': data, 'y': target})
             # x_rows.append(data)
             # y_rows.append(target)
@@ -105,6 +105,15 @@ def fetch_diabetes(subset='train'):
         raise Exception('unknown subset %s' % subset)
 
 
+def run_lars(train):
+    X = train.data
+    y = train.target
+    m = len(X[0])
+    print('m', m)
+    n = len(X)
+    print('n', n)
+
+
 def run():
     train = fetch_diabetes(subset='train')
     test = fetch_diabetes(subset='test')
@@ -112,6 +121,7 @@ def run():
     print((test.data * test.data).sum(0))
     print(np.average(train.target, 0))
     print(np.average(test.target, 0))
+    run_lars(train)
 
 
 if __name__ == '__main__':
