@@ -14,6 +14,7 @@ import pandas
 
 unprocessed_data_url = 'https://web.stanford.edu/~hastie/Papers/LARS/diabetes.data'
 diabetes_md5 = 'af0c583c28547d76cd2db5f5c67de7e8'
+diabetes_train_splitsize = 0.8
 
 lars_datadir = join(os.environ['HOME'], 'lars_data')
 
@@ -41,11 +42,12 @@ def download_dataset(url, dirpath, filename, expected_md5):
             print('... downloaded %s' % filename)
 
 
-def fetch_diabetes():
+def fetch_diabetes(subset='train'):
     download_dataset(unprocessed_data_url, lars_datadir, 'diabetes-data', diabetes_md5)
     filepath = join(lars_datadir, 'diabetes-data')
-    x_rows = []
-    y_rows = []
+    rows = []
+    # x_rows = []
+    # y_rows = []
     with open(filepath, 'r') as f:
         csvreader = csv.reader(f, delimiter='\t')
         for i, row in enumerate(csvreader):
@@ -54,22 +56,65 @@ def fetch_diabetes():
             row = [float(v) for v in row]
             data = row[:9]
             target = row[10]
-            x_rows.append(data)
-            y_rows.append(target)
+            rows.append({'x': data, 'y': target})
+            # x_rows.append(data)
+            # y_rows.append(target)
             # print(row)
-    X = np.array(x_rows)
-    y = np.array(y_rows)
-    print(np.mean(X, 0))
-    X = X - np.average(X, 0)
-    X = X / np.sqrt(X * X).sum(0)
-    print('X', X)
-    y -= np.mean(y)
-    print('y', y)
-    # print(df)
+    train_rows = []
+    test_rows = []
+    total_N = len(rows)
+    train_N = int(total_N * diabetes_train_splitsize)
+    test_N = total_N - train_N
+    rand = np.random.mtrand.RandomState(seed=123)
+    train_idx = set(rand.choice(total_N, size=(train_N,), replace=False))
+    for n, row in enumerate(rows):
+        if n in train_idx:
+            train_rows.append(row)
+        else:
+            test_rows.append(row)
+
+    def rows_to_np(rows):
+        x_rows = []
+        y_rows = []
+        for row in rows:
+            x_rows.append(row['x'])
+            y_rows.append(row['y'])
+        X = np.array(x_rows)
+        y = np.array(y_rows)
+        return X, y
+
+    train_X, train_y = rows_to_np(train_rows)
+    test_X, test_y = rows_to_np(test_rows)
+
+    def get_add_mul(X):
+        add = - np.average(X, 0)
+        X1 = X + add
+        mul = 1 / np.sqrt((X1 * X1).sum(0))
+        return add, mul
+
+    X_add, X_mul = get_add_mul(train_X)
+    y_add = - np.average(train_y)
+
+    train_X = (train_X + X_add) * X_mul
+    train_y = train_y + y_add
+    test_X = (test_X + X_add) * X_mul
+    test_y = test_y + y_add
+
+    if subset == 'train':
+        return sklearn.datasets.base.Bunch(data=train_X, target=train_y)
+    elif subset == 'test':
+        return sklearn.datasets.base.Bunch(data=test_X, target=test_y)
+    else:
+        raise Exception('unknown subset %s' % subset)
 
 
 def run():
-    fetch_diabetes()
+    train = fetch_diabetes(subset='train')
+    test = fetch_diabetes(subset='test')
+    print((train.data * train.data).sum(0))
+    print((test.data * test.data).sum(0))
+    print(np.average(train.target, 0))
+    print(np.average(test.target, 0))
 
 
 if __name__ == '__main__':
