@@ -55,9 +55,6 @@ def fetch_diabetes(subset='train'):
             data = row[:-1]
             target = row[-1]
             rows.append({'x': data, 'y': target})
-            # x_rows.append(data)
-            # y_rows.append(target)
-            # print(row)
     train_rows = []
     test_rows = []
     total_N = len(rows)
