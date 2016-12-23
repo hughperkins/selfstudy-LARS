@@ -12,7 +12,7 @@ import csv
 
 unprocessed_data_url = 'https://web.stanford.edu/~hastie/Papers/LARS/diabetes.data'
 diabetes_md5 = 'af0c583c28547d76cd2db5f5c67de7e8'
-diabetes_train_splitsize = 0.8
+diabetes_train_splitsize = 1.0
 
 lars_datadir = join(os.environ['HOME'], 'lars_data')
 
@@ -91,8 +91,9 @@ def fetch_diabetes(subset='train'):
 
     train_X = (train_X + X_add) * X_mul
     train_y = train_y + y_add
-    test_X = (test_X + X_add) * X_mul
-    test_y = test_y + y_add
+    if len(test_X) > 0:
+        test_X = (test_X + X_add) * X_mul
+        test_y = test_y + y_add
 
     if subset == 'train':
         return sklearn.datasets.base.Bunch(data=train_X, target=train_y)
@@ -109,50 +110,69 @@ def run_lars(train):
     print('m', m)
     n = len(X)
     print('n', n)
-    active_set = set()
 
+    active_set = set()
     cur_pred = np.zeros((n,), dtype=np.float32)
-    print('cur_pred', cur_pred[:5])
     residual = y - cur_pred
-    print('residual', residual[:5])
     cur_corr = X.transpose().dot(residual)
-    print('cur_corr', cur_corr)
     j = np.argmax(np.abs(cur_corr), 0)
     print('j', j)
     active_set.add(j)
 
-    X_a = X[:, list(active_set)]
-    # print('X_a', X_a)
-    G_a = X_a.transpose().dot(X_a)
-    print('G_a', G_a)
-    G_a_inv = np.linalg.inv(G_a)
-    G_a_inv_red_cols = np.sum(G_a_inv, 1)
-    print(G_a_inv_red_cols)
-    A_a = 1 / np.sqrt(np.sum(G_a_inv_red_cols))
-    print('A_a', A_a)
-    omega = A_a * G_a_inv_red_cols
-    equiangular = (omega * X_a).reshape(n)
-    print('equiangular[:5]', equiangular[:5])
-    print('equiangular.shape', equiangular.shape)
-    a = X.transpose().dot(equiangular)
-    print('a.shape', a.shape)
-    # print('a[:5, :5]', a[:5, :5])
-    gamma = None
-    largest_abs_correlation = cur_corr.max()
-    for j in active_set:
-        print('j', j)
-        print(cur_corr.shape, a.shape)
-        v0 = (largest_abs_correlation - cur_corr[j]) / (A_a - a[j]).item()
-        v1 = (largest_abs_correlation + cur_corr[j]) / (A_a + a[j]).item()
-        print('v0', v0, 'v1', v1)
-        if v0 > 0 and (gamma is None or v0 < gamma):
-            gamma = v0
-        if v1 > 0 and (gamma is None or v1 < gamma):
-            gamma = v1
-    print('gamma', gamma)
-    cur_pred += gamma * equiangular
-    print('cur_pred[:5]', cur_pred[:5])
-    print('resid[:5]', (y - cur_pred)[:5])
+    while len(active_set) < m:
+        # print('cur_pred', cur_pred[:5])
+        residual = y - cur_pred
+        # print('residual', residual[:5])
+        print('avg abs residual', np.average(np.abs(residual)))
+        print('avg square residual', np.average(residual * residual))
+        cur_corr = X.transpose().dot(residual)
+        # print('cur_corr', cur_corr)
+
+        X_a = X[:, list(active_set)]
+        # print('X_a', X_a)
+        G_a = X_a.transpose().dot(X_a)
+        # print('G_a', G_a)
+        G_a_inv = np.linalg.inv(G_a)
+        G_a_inv_red_cols = np.sum(G_a_inv, 1)
+        # print(G_a_inv_red_cols)
+        A_a = 1 / np.sqrt(np.sum(G_a_inv_red_cols))
+        # print('A_a', A_a)
+        omega = A_a * G_a_inv_red_cols
+        equiangular = X_a.dot(omega)  # .reshape(n)
+        # print('equiangular.shape', equiangular.shape)
+        # assert equiangular.shape[1] == 1
+        # equiangular = equiangular[:, 0]
+        # print('equiangular[:5]', equiangular[:5])
+        # print('equiangular.shape', equiangular.shape)
+        a = X.transpose().dot(equiangular)
+        # print('a.shape', a.shape)
+        # print('a[:5, :5]', a[:5, :5])
+        gamma = None
+        largest_abs_correlation = cur_corr.max()
+        next_j = None
+        for j in range(m):
+            if j in active_set:
+                continue
+            # print('j', j)
+            # print(cur_corr.shape, a.shape)
+            v0 = (largest_abs_correlation - cur_corr[j]) / (A_a - a[j]).item()
+            v1 = (largest_abs_correlation + cur_corr[j]) / (A_a + a[j]).item()
+            # print('v0', v0, 'v1', v1)
+            if v0 > 0 and (gamma is None or v0 < gamma):
+                next_j = j
+                gamma = v0
+            if v1 > 0 and (gamma is None or v1 < gamma):
+                gamma = v1
+                next_j = j
+        print('next j', next_j)
+        active_set.add(next_j)
+        # print('gamma', gamma)
+        cur_pred += gamma * equiangular
+        # print('cur_pred[:5]', cur_pred[:5])
+
+    # residual = y - cur_pred
+    # print('resid[:5]', residual[:5])
+    # print('avg abs residual', np.average(np.abs(residual)))
 
 
 def run():
