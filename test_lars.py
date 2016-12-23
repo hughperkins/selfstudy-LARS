@@ -118,6 +118,7 @@ def run_lars(train):
     j = np.argmax(np.abs(cur_corr), 0)
     print('j', j)
     active_set.add(j)
+    beta = np.zeros((m,), dtype=np.float32)
 
     while len(active_set) < m:
         # print('cur_pred', cur_pred[:5])
@@ -149,6 +150,7 @@ def run_lars(train):
         # print('a[:5, :5]', a[:5, :5])
         gamma = None
         largest_abs_correlation = cur_corr.max()
+        print('largest_abs_correlation', largest_abs_correlation)
         next_j = None
         for j in range(m):
             if j in active_set:
@@ -157,17 +159,19 @@ def run_lars(train):
             # print(cur_corr.shape, a.shape)
             v0 = (largest_abs_correlation - cur_corr[j]) / (A_a - a[j]).item()
             v1 = (largest_abs_correlation + cur_corr[j]) / (A_a + a[j]).item()
-            # print('v0', v0, 'v1', v1)
+            print(j, 'v0', v0, 'v1', v1)
             if v0 > 0 and (gamma is None or v0 < gamma):
                 next_j = j
                 gamma = v0
             if v1 > 0 and (gamma is None or v1 < gamma):
                 gamma = v1
                 next_j = j
-        print('next j', next_j)
-        active_set.add(next_j)
+        print('next j', next_j, 'gamma', gamma, 'new max correlation: %s' % (largest_abs_correlation - gamma * A_a))
         # print('gamma', gamma)
         cur_pred += gamma * equiangular
+        # for j in active_set:
+        #     beta[j] += gamma * 
+        active_set.add(next_j)
         # print('cur_pred[:5]', cur_pred[:5])
 
     # residual = y - cur_pred
