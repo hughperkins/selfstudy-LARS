@@ -1,5 +1,4 @@
 import numpy as np
-import requests
 import os
 import urllib
 import shutil
@@ -9,7 +8,6 @@ from os.path import join
 import argparse
 import sklearn.datasets
 import csv
-import pandas
 
 
 unprocessed_data_url = 'https://web.stanford.edu/~hastie/Papers/LARS/diabetes.data'
@@ -64,7 +62,6 @@ def fetch_diabetes(subset='train'):
     test_rows = []
     total_N = len(rows)
     train_N = int(total_N * diabetes_train_splitsize)
-    test_N = total_N - train_N
     rand = np.random.mtrand.RandomState(seed=123)
     train_idx = set(rand.choice(total_N, size=(train_N,), replace=False))
     for n, row in enumerate(rows):
