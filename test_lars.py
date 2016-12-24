@@ -1,83 +1,32 @@
 import numpy as np
-import os
-import urllib
-import shutil
-import hashlib
-from os import path
-from os.path import join
 import sklearn.datasets
-import csv
 
 
-unprocessed_data_url = 'https://web.stanford.edu/~hastie/Papers/LARS/diabetes.data'
-diabetes_md5 = 'af0c583c28547d76cd2db5f5c67de7e8'
 diabetes_train_splitsize = 1.0
-
-lars_datadir = join(os.environ['HOME'], 'lars_data')
-
-
-def get_md5(filepath):
-    with open(filepath, 'rb') as f:
-        dat = f.read()
-    return hashlib.md5(dat).hexdigest()
-
-
-def download_dataset(url, dirpath, filename, expected_md5):
-    if not path.isdir(dirpath):
-        os.makedirs(dirpath)
-    file_exists = False
-    datafilepath = join(dirpath, filename)
-    if path.isfile(datafilepath):
-        md5sum = get_md5(datafilepath)
-        if md5sum == expected_md5:
-            file_exists = True
-    if not file_exists:
-        print('downloading %s...' % filename)
-        with urllib.request.urlopen(url) as response, open(datafilepath, 'wb') as out_file:
-            shutil.copyfileobj(response, out_file)
-            print(get_md5(datafilepath))
-            print('... downloaded %s' % filename)
 
 
 def fetch_diabetes(subset='train'):
-    download_dataset(unprocessed_data_url, lars_datadir, 'diabetes-data', diabetes_md5)
-    filepath = join(lars_datadir, 'diabetes-data')
-    rows = []
-    # x_rows = []
-    # y_rows = []
-    with open(filepath, 'r') as f:
-        csvreader = csv.reader(f, delimiter='\t')
-        for i, row in enumerate(csvreader):
-            if i == 0:
-                continue
-            row = [float(v) for v in row]
-            data = row[:-1]
-            target = row[-1]
-            rows.append({'x': data, 'y': target})
-    train_rows = []
-    test_rows = []
-    total_N = len(rows)
+    diabetes = sklearn.datasets.load_diabetes()
+    X_all = diabetes.data
+    y_all = diabetes.target
+
+    total_N = len(y_all)
     train_N = int(total_N * diabetes_train_splitsize)
+    test_N = total_N - train_N
     rand = np.random.mtrand.RandomState(seed=123)
     train_idx = set(rand.choice(total_N, size=(train_N,), replace=False))
-    for n, row in enumerate(rows):
-        if n in train_idx:
-            train_rows.append(row)
-        else:
-            test_rows.append(row)
 
-    def rows_to_np(rows):
-        x_rows = []
-        y_rows = []
-        for row in rows:
-            x_rows.append(row['x'])
-            y_rows.append(row['y'])
-        X = np.array(x_rows)
-        y = np.array(y_rows)
-        return X, y
+    train_X = X_all[list(train_idx)]
+    train_y = y_all[list(train_idx)]
 
-    train_X, train_y = rows_to_np(train_rows)
-    test_X, test_y = rows_to_np(test_rows)
+    test_idx = np.zeros((test_N,), dtype=np.int32)
+    test_n = 0
+    for n in range(total_N):
+        if n not in train_idx:
+            test_idx[test_n] = n
+            test_n += 1
+    test_X = X_all[test_idx]
+    test_y = y_all[test_idx]
 
     def get_add_mul(X):
         add = - np.average(X, 0)
