@@ -7,3 +7,5 @@ Code correctness checked by comparing results with those at:
 http://scikit-learn.org/stable/auto_examples/linear_model/plot_lasso_lars.html#sphx-glr-auto-examples-linear-model-plot-lasso-lars-py
 
 Plotting code is basically copied from http://scikit-learn.org/stable/auto_examples/linear_model/plot_lasso_lars.html
+
+Please open the [notebook](test_lars.ipynb)
