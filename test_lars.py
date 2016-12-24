@@ -131,6 +131,12 @@ def run_lars(train):
         # print('cur_pred', cur_pred[:5])
         residual = y - cur_pred
         print('len residual', vector_len(residual), 'len y', vector_len(y), 'len(cur_pred)', vector_len(cur_pred))
+        mse = np.sqrt(np.sum(residual * residual))
+        print('mse', mse)
+
+        pred_from_beta = X.dot(beta)
+        print(np.sum(np.abs(pred_from_beta - cur_pred)))
+
         # print('residual', residual[:5])
         # print('avg abs residual', np.average(np.abs(residual)))
         # print('avg square residual', np.average(residual * residual))
@@ -201,14 +207,38 @@ def run_lars(train):
         # test_pred = cur_pred
         # test_pred = np.zeros((n,), dtype=np.float32)
         # print('active set')
-        for j in active_set:
+
+        # coeffs, eg for 3 vectors
+        # c_0 * x_0 + c_1 * x_1 + c_2 * x_2 = equiangular
+        # we know: x_0, x_1, x_2, equiangular
+        # they're all vectors, so equation must hold for each dimension
+        # ie, we have equations:
+        # c_0 * x_0_0 + c_1 * x_1_0 + c_2 * x_2_0 = equi_0
+        # c_0 * x_0_1 + c_1 * x_1_1 + c_2 * x_2_1 = equi_1
+        # c_0 * x_0_2 + c_1 * x_1_2 + c_2 * x_2_2 = equi_2
+        # ...
+        # comparing with doc at
+        # https://docs.scipy.org/doc/numpy/reference/generated/numpy.linalg.solve.html#numpy.linalg.solve
+        # their x_0, x_1, x_2 is our c_0, c_1, c_2
+        # their constants are our x_0_0, ...
+        # edit since not square, trying
+        # https://docs.scipy.org/doc/numpy/reference/generated/numpy.linalg.lstsq.html#numpy.linalg.lstsq
+        sa = X_a
+        sb = equiangular * gamma
+        print(sa.shape)
+        print(sb.shape)
+        sx = np.linalg.lstsq(sa, sb)
+        print('sx', sx)
+        for i, j in enumerate(active_set):
+            beta[j] += sx[0][i] * sign[j]
+        # for j in active_set:
             # angle = math.acos(cos_angle[j]) * 180 / 3.1416
-            coeff = gamma / len(active_set) / cos_angle[j]  # * sign[j]
+            # coeff = gamma / len(active_set) / cos_angle[j]  # * sign[j]
             # coeff = gamma / cos_angle[j]
             # print('j %s angle %s' % (j, angle), 'coeff', coeff)
-            beta[j] += coeff
-            proj = (coeff * X[:, j]).dot(equiangular)
-            print('j', j, 'proj', proj)
+            # beta[j] += coeff
+            # proj = (coeff * X[:, j]).dot(equiangular)
+            # print('j', j, 'proj', proj)
             # test_pred += coeff * X[:, j]
         # print('len test_pred', vector_len(test_pred))
         # print('new_pred - test_pred', vector_len(cur_pred + gamma * equiangular - test_pred))
@@ -219,7 +249,8 @@ def run_lars(train):
         # angle = 
         # for j in active_set:
         #     beta[j] += gamma * 
-        cur_pred += gamma * equiangular
+        # cur_pred += gamma * equiangular
+        cur_pred = X.dot(beta)
         active_set.add(next_j)
         sign[next_j] = next_sign
         # print('cur_pred[:5]', cur_pred[:5])
