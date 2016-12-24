@@ -6,4 +6,4 @@ Based on http://statweb.stanford.edu/~tibs/lasso/simple.html , and on http://www
 Code correctness checked by comparing with
 http://scikit-learn.org/stable/auto_examples/linear_model/plot_lasso_lars.html#sphx-glr-auto-examples-linear-model-plot-lasso-lars-py
 
-I also basically copied the plotting code from the sciki-learn lars example.
+Plotting code is basically copied from http://scikit-learn.org/stable/auto_examples/linear_model/plot_lasso_lars.html
