@@ -2,6 +2,7 @@ import numpy as np
 import os
 import urllib
 import shutil
+import math
 import hashlib
 from os import path
 from os.path import join
@@ -103,6 +104,10 @@ def fetch_diabetes(subset='train'):
         raise Exception('unknown subset %s' % subset)
 
 
+def vector_len(vector):
+    return np.sqrt(np.sum(vector * vector))
+
+
 def run_lars(train):
     X = train.data
     y = train.target
@@ -119,17 +124,21 @@ def run_lars(train):
     print('j', j)
     active_set.add(j)
     beta = np.zeros((m,), dtype=np.float32)
+    sign = np.zeros((m,), dtype=np.int32)
+    sign[j] = 1
 
     while len(active_set) < m:
         # print('cur_pred', cur_pred[:5])
         residual = y - cur_pred
+        print('len residual', vector_len(residual), 'len y', vector_len(y), 'len(cur_pred)', vector_len(cur_pred))
         # print('residual', residual[:5])
-        print('avg abs residual', np.average(np.abs(residual)))
-        print('avg square residual', np.average(residual * residual))
+        # print('avg abs residual', np.average(np.abs(residual)))
+        # print('avg square residual', np.average(residual * residual))
         cur_corr = X.transpose().dot(residual)
         # print('cur_corr', cur_corr)
 
         X_a = X[:, list(active_set)]
+        X_a *= sign[list(active_set)]
         # print('X_a', X_a)
         G_a = X_a.transpose().dot(X_a)
         # print('G_a', G_a)
@@ -140,39 +149,81 @@ def run_lars(train):
         # print('A_a', A_a)
         omega = A_a * G_a_inv_red_cols
         equiangular = X_a.dot(omega)  # .reshape(n)
+
+        # print('length equiangular', np.sqrt(np.sum(equiangular * equiangular)))
+
         # print('equiangular.shape', equiangular.shape)
         # assert equiangular.shape[1] == 1
         # equiangular = equiangular[:, 0]
         # print('equiangular[:5]', equiangular[:5])
         # print('equiangular.shape', equiangular.shape)
-        a = X.transpose().dot(equiangular)
+        cos_angle = X.transpose().dot(equiangular)
         # print('a.shape', a.shape)
+        # print('cos_angle', cos_angle)
+        print('np.arccos(cos_angle) * 180/3.1416', np.arccos(cos_angle) * 180/3.1416)
         # print('a[:5, :5]', a[:5, :5])
         gamma = None
-        largest_abs_correlation = cur_corr.max()
+        largest_abs_correlation = np.abs(cur_corr).max()
         print('largest_abs_correlation', largest_abs_correlation)
         next_j = None
+        next_sign = 0
         for j in range(m):
             if j in active_set:
                 continue
             # print('j', j)
             # print(cur_corr.shape, a.shape)
-            v0 = (largest_abs_correlation - cur_corr[j]) / (A_a - a[j]).item()
-            v1 = (largest_abs_correlation + cur_corr[j]) / (A_a + a[j]).item()
+            v0 = (largest_abs_correlation - cur_corr[j]) / (A_a - cos_angle[j]).item()
+            v1 = (largest_abs_correlation + cur_corr[j]) / (A_a + cos_angle[j]).item()
             print(j, 'v0', v0, 'v1', v1)
             if v0 > 0 and (gamma is None or v0 < gamma):
                 next_j = j
                 gamma = v0
+                next_sign = 1
             if v1 > 0 and (gamma is None or v1 < gamma):
                 gamma = v1
                 next_j = j
-        print('next j', next_j, 'gamma', gamma, 'new max correlation: %s' % (largest_abs_correlation - gamma * A_a))
+                next_sign = -1
         # print('gamma', gamma)
-        cur_pred += gamma * equiangular
+
+        # a . b = |a| |b| cos theta
+        # theta = acos(a . b / |a| / |b|)
+        # equiangular and x_j are length 1, so
+        # angle = acos(equiangular . x_j)
+        # then coeff = gamma / len(active_set) * cos(theta)
+        #            = gamma / len(active_set) * x_j . equiangular
+        # for j in range(m):
+            # angle = math.acos(cos_angle[j]) * 180 / 3.1416
+            # coeff = gamma / len(active_set) / cos_angle[j]
+            # print('j %s angle %s' % (j, angle), 'coeff', coeff)
+            # new_pred = cur_pred + coeff * X[:, j]
+            # print()
+            # print('coeff', coeff)
+        # test_pred = cur_pred
+        # test_pred = np.zeros((n,), dtype=np.float32)
+        # print('active set')
+        for j in active_set:
+            # angle = math.acos(cos_angle[j]) * 180 / 3.1416
+            coeff = gamma / len(active_set) / cos_angle[j]  # * sign[j]
+            # coeff = gamma / cos_angle[j]
+            # print('j %s angle %s' % (j, angle), 'coeff', coeff)
+            beta[j] += coeff
+            proj = (coeff * X[:, j]).dot(equiangular)
+            print('j', j, 'proj', proj)
+            # test_pred += coeff * X[:, j]
+        # print('len test_pred', vector_len(test_pred))
+        # print('new_pred - test_pred', vector_len(cur_pred + gamma * equiangular - test_pred))
+        # print('gamma * equiangular - test_pred', vector_len(gamma * equiangular - test_pred))
+
+        print('next j', next_j, 'next sign', next_sign, 'gamma', gamma, 'new max correlation: %s' % (
+            largest_abs_correlation - gamma * A_a))
+        # angle = 
         # for j in active_set:
         #     beta[j] += gamma * 
+        cur_pred += gamma * equiangular
         active_set.add(next_j)
+        sign[next_j] = next_sign
         # print('cur_pred[:5]', cur_pred[:5])
+        print('beta', beta)
 
     # residual = y - cur_pred
     # print('resid[:5]', residual[:5])
