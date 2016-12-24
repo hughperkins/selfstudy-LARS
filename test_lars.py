@@ -127,7 +127,7 @@ def run_lars(train):
     sign = np.zeros((m,), dtype=np.int32)
     sign[j] = 1
 
-    while len(active_set) < m:
+    for it in range(m):
         # print('cur_pred', cur_pred[:5])
         residual = y - cur_pred
         print('len residual', vector_len(residual), 'len y', vector_len(y), 'len(cur_pred)', vector_len(cur_pred))
@@ -171,24 +171,28 @@ def run_lars(train):
         gamma = None
         largest_abs_correlation = np.abs(cur_corr).max()
         print('largest_abs_correlation', largest_abs_correlation)
-        next_j = None
-        next_sign = 0
-        for j in range(m):
-            if j in active_set:
-                continue
-            # print('j', j)
-            # print(cur_corr.shape, a.shape)
-            v0 = (largest_abs_correlation - cur_corr[j]) / (A_a - cos_angle[j]).item()
-            v1 = (largest_abs_correlation + cur_corr[j]) / (A_a + cos_angle[j]).item()
-            print(j, 'v0', v0, 'v1', v1)
-            if v0 > 0 and (gamma is None or v0 < gamma):
-                next_j = j
-                gamma = v0
-                next_sign = 1
-            if v1 > 0 and (gamma is None or v1 < gamma):
-                gamma = v1
-                next_j = j
-                next_sign = -1
+        if it < m - 1:
+            next_j = None
+            next_sign = 0
+            for j in range(m):
+                if j in active_set:
+                    continue
+                # print('j', j)
+                # print(cur_corr.shape, a.shape)
+                v0 = (largest_abs_correlation - cur_corr[j]) / (A_a - cos_angle[j]).item()
+                v1 = (largest_abs_correlation + cur_corr[j]) / (A_a + cos_angle[j]).item()
+                print(j, 'v0', v0, 'v1', v1)
+                if v0 > 0 and (gamma is None or v0 < gamma):
+                    next_j = j
+                    gamma = v0
+                    next_sign = 1
+                if v1 > 0 and (gamma is None or v1 < gamma):
+                    gamma = v1
+                    next_j = j
+                    next_sign = -1
+        else:
+            print('len active set', len(active_set), 'next j', next_j)
+            gamma = largest_abs_correlation / A_a
         # print('gamma', gamma)
 
         # a . b = |a| |b| cos theta
