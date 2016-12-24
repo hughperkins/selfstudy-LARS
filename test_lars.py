@@ -1,5 +1,6 @@
 import numpy as np
 import sklearn.datasets
+import matplotlib.pyplot as plt
 
 
 diabetes_train_splitsize = 1.0
@@ -74,6 +75,7 @@ def run_lars(train):
     sign = np.zeros((m,), dtype=np.int32)
     sign[j] = 1
 
+    beta_path = np.zeros((m, m), dtype=np.float32)
     for it in range(m):
         # print('cur_pred', cur_pred[:5])
         residual = y - cur_pred
@@ -152,7 +154,20 @@ def run_lars(train):
         active_set.add(next_j)
         sign[next_j] = next_sign
 
+        beta_path[it, :] = beta
         print('beta', beta)
+
+    print('beta_path', beta_path)
+    sum_abs_coeff = np.sum(np.abs(beta_path), 1)
+    print('sum_abs_coeff', sum_abs_coeff)
+
+    # plotting code is based on:
+    # http://scikit-learn.org/stable/auto_examples/linear_model/plot_lasso_lars.html#sphx-glr-auto-examples-linear-model-plot-lasso-lars-py
+    plt.plot(sum_abs_coeff, beta_path)
+    plt.title('LARS Path')
+    plt.ylabel('beta_j')
+    plt.xlabel('sum_j(|coeff_j|)')
+    plt.show()
 
 
 def run():
